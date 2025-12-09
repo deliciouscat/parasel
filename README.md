@@ -14,7 +14,7 @@ from parasel import Run, Parallel, Serial
 from modules.llm import Summarize, KeywordExtraction
 from modules.retrieve import BM25, Embedding
 
-# 표준 사용 예.
+# 표준 입력 예시.
 user_input = {
     # 필수 입력값.
     "requester_type": "user",   # 요청 주체가 user일수도 있고, page일 수도 있고...
@@ -24,38 +24,64 @@ user_input = {
     "query": "이 페이지에서 \'절차적 생성\'이 의미하는 바는?",
     "page": "... extracted HTML contents ..."
 }
-
-Run(user_input, task=user_input.task, version="newest")
-# task 입력 없을 시 1) user_input.task 참조 2) 그마저도 없으면 Error Messege
 ```
 
 ### 모듈 구현 예시
 ```py
 # modules/llm/KeywordExtraction.py
-def KeywordExtraction(~, args):
+def KeywordExtraction(~, out_name, args):
     ...
-    args['keywords'] = keyword_list
+    args[out_name] = keyword_list
 
 # modules/llm/Summary.py
-def Summary(~, args):
+def Summary(~, out_name, args):
     ...
-    args['']
+    args[out_name]
+
+# modules/llm/Merge.py
+def Merge(~, out_name, args):
+    ...
+    merged_summary = some_function(
+        args["gemini-summary"], args["haiku-summary"]
+        )
+    ... 각 결과의 장점 취합 ...
+    args[out_name] = merged_summary
+
+# modules/llm/QueryExpansion.py
+def QueryExpansion(~, args):
+    ...
+    args['query'] = search_query
+
+# modules/search/DuckDuckGo.py
+def DuckDuckGo(~, args):
+    ...
+    args['search_result'] = url_list
 ```
 
 ### task 구현 예시
 ```py
 # tasks/search.py
-from modules.llm import KeywordExtraction, Summary
+from parasel import Task
+from modules.llm import KeywordExtraction, Summary, ...
 
 search = Serial([
-    KeywordExtraction(~),
+    KeywordExtraction(~, out_name="keyword"),
     Parallel([
-        Summarize("gemini-pro"),
-        Summarize("Claude-haiku"),
-    ])
+        Summarize("gemini-pro", out_name="gempro-summary"),
+        Summarize("Claude-haiku", out_name="haiku-summary"),
+    ]),
+    Merge(~, out_name="summary"),
+    DuckDuckGo(~, out_name="search-result")
 ])
 ```
 
+### task 사용 명령
+
+```py
+Run(user_input, task=user_input.task, version="newest")
+# 
+# task 입력 없을 시 1) user_input.task 참조 2) 그마저도 없으면 Error Messege
+```
 
 # 기반 라이브러리
 다음의 프레임워크와의 호환성을 우선시 한다.
