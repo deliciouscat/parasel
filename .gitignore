@@ -44,7 +44,6 @@ htmlcov/
 Thumbs.db
 
 # For development
-docs/
 TODO.md
 
 # For testing
