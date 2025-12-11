@@ -43,8 +43,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# For development
+docs/
+TODO.md
+
 # For testing
-examples/
 modules/
 tasks/
 tests/

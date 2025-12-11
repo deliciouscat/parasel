@@ -42,9 +42,9 @@ python examples/api_example.py
 from parasel import Run, Serial, Parallel, ModuleAdapter
 # 표준 사용법: `modules/` 디렉토리에 각 컴포넌트를 정의한다.
 # 각 모듈은 라이브러리 자체가 아니라 직접 구현하여 사용함.
-from modules.llm.keyword_extraction import keyword_extraction
-from modules.llm.summarize import summarize_gemini, summarize_haiku
-from modules.search.duckduckgo import duckduckgo_search
+from modules.llm.keyword_extraction import keyword_extraction       # 직접 구현
+from modules.llm.summarize import summarize_gemini, summarize_haiku # 직접 구현
+from modules.search.duckduckgo import duckduckgo_search # 직접 구현
 ```
 
 ### 표준 입력 예시
@@ -193,25 +193,6 @@ your-project/
 - Pydantic AI
 - OpenRouter
 - Convex
-
-## 개발 및 테스트
-
-```bash
-# 단위 테스트 실행
-pytest -m "not integration"
-
-# 통합 테스트 포함 (API 키 필요)
-pytest
-
-# OpenRouter 통합 테스트
-pytest tests/test_openrouter.py -m integration -v
-
-# 코드 포매팅
-black parasel/
-
-# 린팅
-ruff parasel/
-```
 
 ## 라이선스
 

@@ -134,5 +134,3 @@ parasel/
 3. 레지스트리에 등록하고 Run 함수로 실행
 4. 필요시 FastAPI로 배포
 
-자세한 내용은 `docs/architecture.md`와 예제 코드를 참고하세요.
-
