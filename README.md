@@ -35,9 +35,12 @@ python examples/api_example.py
 자세한 사용법은 [USAGE.md](USAGE.md)를 참고하세요.
 
 # 사용 방법
+다음의 순서로 파이프라인을 만들어 배포한다.
+1. 각각의 프로세스를 모듈화하여 `module` 디렉토리에 저장.
+2. 각 module을 `Parallel`, `Serial`을 통해 연결하여 하나의 `task`를 정의.
+3. 서버로 배포하고자 하는 task를 `Registry`를 통해 등록하고 `create_app`으로 배포. 
 
 ## Parallel / Serial
-
 ```py
 from parasel import Run, Serial, Parallel, ModuleAdapter
 # 표준 사용법: `modules/` 디렉토리에 각 컴포넌트를 정의한다.
