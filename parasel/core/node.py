@@ -1,10 +1,11 @@
 """Node 추상화: Composite 패턴으로 Serial/Parallel 파이프라인 정의"""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Iterator, Union, Iterable
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from parasel.core.context import Context
+import copy
 
 
 class ExecutionError(Exception):
@@ -153,7 +154,7 @@ class Parallel(Node):
     
     def __init__(
         self,
-        children: List[Node],
+        children: List[Union[Node, Iterable[Node]]],
         name: Optional[str] = None,
         max_workers: Optional[int] = None,
         fail_fast: bool = True,
@@ -161,15 +162,27 @@ class Parallel(Node):
     ):
         """
         Args:
-            children: 병렬 실행할 자식 노드 리스트
+            children: 병렬 실행할 자식 노드 리스트 (Iterable을 포함할 수 있음)
             name: 노드 이름
             max_workers: 최대 워커 수 (None이면 자식 수만큼)
             fail_fast: True면 첫 에러 발생 시 즉시 중단, False면 모든 노드 완료 후 에러 수집
             **kwargs: Node 기본 인자들
         """
         super().__init__(name=name or "Parallel", **kwargs)
-        self.children = children
-        self.max_workers = max_workers or len(children)
+        
+        # children을 flatten (ByArgs 등의 iterable 지원)
+        flattened_children = []
+        for child in children:
+            if isinstance(child, Node):
+                flattened_children.append(child)
+            elif hasattr(child, '__iter__') and not isinstance(child, (str, bytes)):
+                # Iterable이면 펼침
+                flattened_children.extend(child)
+            else:
+                flattened_children.append(child)
+        
+        self.children = flattened_children
+        self.max_workers = max_workers or len(self.children) if self.children else 1
         self.fail_fast = fail_fast
     
     def run(self, context: Context) -> None:
@@ -262,3 +275,225 @@ class Parallel(Node):
                 node_name=self.name,
             )
 
+
+class ByArgs:
+    """
+    주어진 args의 각 값에 대해 노드를 복제하여 생성하는 헬퍼 클래스.
+    
+    Parallel과 함께 사용하여 동일한 함수를 다른 인자로 여러 번 실행할 수 있습니다.
+    각 실행 결과는 지정된 out_name에 리스트로 누적됩니다.
+    
+    예제:
+        ```python
+        Parallel([
+            ByArgs(query_expansion, args={"language": ["en", "ko"]})
+        ])
+        ```
+        
+        이는 query_expansion을 language="en"과 language="ko"로 각각 실행합니다.
+    """
+    
+    def __init__(self, base_node, args: Dict[str, List[Any]]):
+        """
+        Args:
+            base_node: 복제할 기본 노드 (보통 ModuleAdapter)
+            args: 파라미터 이름과 값 리스트의 딕셔너리
+                  예: {"language": ["en", "ko"], "max_results": [10, 20]}
+        """
+        from parasel.core.module_adapter import ModuleAdapter
+        
+        if not isinstance(base_node, ModuleAdapter):
+            raise TypeError("ByArgs는 ModuleAdapter와 함께 사용해야 합니다")
+        
+        self.base_node = base_node
+        self.args = args
+    
+    def __iter__(self) -> Iterator[Node]:
+        """
+        각 arg 조합에 대해 노드를 생성합니다.
+        
+        cartesian product를 사용하여 모든 파라미터 조합을 생성합니다.
+        """
+        from parasel.core.module_adapter import ModuleAdapter
+        
+        # 모든 파라미터에 대해 cartesian product 생성
+        import itertools
+        
+        param_names = list(self.args.keys())
+        param_values = [self.args[name] for name in param_names]
+        
+        # 각 조합에 대해 노드 생성
+        for combination in itertools.product(*param_values):
+            # 새로운 kwargs 생성
+            new_kwargs = dict(zip(param_names, combination))
+            
+            # 기존 func_kwargs와 병합
+            merged_kwargs = {**self.base_node.func_kwargs, **new_kwargs}
+            
+            # 새로운 ModuleAdapter 생성
+            node = ModuleAdapter(
+                func=self.base_node.func,
+                out_name=self.base_node.out_name,
+                name=f"{self.base_node.name}[{','.join(f'{k}={v}' for k, v in new_kwargs.items())}]",
+                **merged_kwargs
+            )
+            
+            # _accumulate_result 플래그 설정 (나중에 ModuleAdapter에서 처리)
+            node._accumulate_result = True
+            
+            yield node
+    
+    def __repr__(self) -> str:
+        return f"ByArgs(node={self.base_node.name}, args={self.args})"
+
+
+class ByKeys(Node):
+    """
+    Context의 특정 키에 저장된 리스트의 각 아이템에 대해 노드를 실행하는 클래스.
+    
+    실행 시점에 Context를 읽어 동적으로 여러 노드를 생성하고 병렬 실행합니다.
+    
+    예제:
+        ```python
+        # context["query_expansion"] = ["query1", "query2", "query3"]
+        Parallel([
+            ByKeys(duckduckgo_search, keys=["query_expansion"])
+        ])
+        ```
+        
+        이는 query_expansion의 각 쿼리에 대해 duckduckgo_search를 실행합니다.
+    """
+    
+    def __init__(
+        self,
+        base_node,
+        keys: List[str],
+        input_key_name: str = "input",
+        name: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Args:
+            base_node: 복제할 기본 노드 (보통 ModuleAdapter)
+            keys: Context에서 읽을 키 리스트 (각 키는 리스트여야 함)
+            input_key_name: base_node 함수에 각 아이템을 전달할 파라미터 이름
+            name: 노드 이름
+            **kwargs: Node 기본 인자들
+        """
+        from parasel.core.module_adapter import ModuleAdapter
+        
+        if not isinstance(base_node, ModuleAdapter):
+            raise TypeError("ByKeys는 ModuleAdapter와 함께 사용해야 합니다")
+        
+        super().__init__(name=name or f"ByKeys[{','.join(keys)}]", **kwargs)
+        self.base_node = base_node
+        self.keys = keys
+        self.input_key_name = input_key_name
+    
+    def run(self, context: Context) -> None:
+        """
+        Context에서 키를 읽고 각 아이템에 대해 노드를 실행합니다.
+        """
+        from parasel.core.module_adapter import ModuleAdapter
+        
+        # 모든 키에서 아이템 수집
+        all_items = []
+        for key in self.keys:
+            if key not in context:
+                raise ExecutionError(
+                    f"ByKeys: key '{key}' not found in context",
+                    node_name=self.name
+                )
+            
+            value = context[key]
+            if not isinstance(value, (list, tuple)):
+                raise ExecutionError(
+                    f"ByKeys: key '{key}' must be a list or tuple, got {type(value)}",
+                    node_name=self.name
+                )
+            
+            # 중첩 리스트를 flatten
+            for item in value:
+                if isinstance(item, (list, tuple)):
+                    all_items.extend(item)
+                else:
+                    all_items.append(item)
+        
+        if not all_items:
+            # 아이템이 없으면 아무것도 하지 않음
+            return
+        
+        # 각 아이템에 대해 노드 생성
+        nodes = []
+        for i, item in enumerate(all_items):
+            # 새로운 kwargs 생성
+            new_kwargs = {**self.base_node.func_kwargs, self.input_key_name: item}
+            
+            # 새로운 ModuleAdapter 생성
+            node = ModuleAdapter(
+                func=self.base_node.func,
+                out_name=self.base_node.out_name,
+                name=f"{self.base_node.name}[{i}]",
+                **new_kwargs
+            )
+            
+            # _accumulate_result 플래그 설정
+            node._accumulate_result = True
+            
+            nodes.append(node)
+        
+        # 병렬 실행
+        parallel = Parallel(nodes, name=f"{self.name}_parallel")
+        parallel.run(context)
+    
+    async def run_async(self, context: Context) -> None:
+        """비동기 실행"""
+        from parasel.core.module_adapter import ModuleAdapter
+        
+        # 모든 키에서 아이템 수집
+        all_items = []
+        for key in self.keys:
+            if key not in context:
+                raise ExecutionError(
+                    f"ByKeys: key '{key}' not found in context",
+                    node_name=self.name
+                )
+            
+            value = context[key]
+            if not isinstance(value, (list, tuple)):
+                raise ExecutionError(
+                    f"ByKeys: key '{key}' must be a list or tuple, got {type(value)}",
+                    node_name=self.name
+                )
+            
+            # 중첩 리스트를 flatten
+            for item in value:
+                if isinstance(item, (list, tuple)):
+                    all_items.extend(item)
+                else:
+                    all_items.append(item)
+        
+        if not all_items:
+            return
+        
+        # 각 아이템에 대해 노드 생성
+        nodes = []
+        for i, item in enumerate(all_items):
+            new_kwargs = {**self.base_node.func_kwargs, self.input_key_name: item}
+            
+            node = ModuleAdapter(
+                func=self.base_node.func,
+                out_name=self.base_node.out_name,
+                name=f"{self.base_node.name}[{i}]",
+                **new_kwargs
+            )
+            
+            node._accumulate_result = True
+            nodes.append(node)
+        
+        # 병렬 비동기 실행
+        parallel = Parallel(nodes, name=f"{self.name}_parallel")
+        await parallel.run_async(context)
+    
+    def __repr__(self) -> str:
+        return f"ByKeys(node={self.base_node.name}, keys={self.keys})"

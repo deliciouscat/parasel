@@ -1,6 +1,6 @@
 """Parasel: AI 파이프라인을 직렬/병렬의 중첩 리스트로 통제하기 위한 프레임워크"""
 
-from parasel.core.node import Node, Serial, Parallel
+from parasel.core.node import Node, Serial, Parallel, ByArgs, ByKeys
 from parasel.core.context import Context
 from parasel.core.module_adapter import ModuleAdapter
 from parasel.core.executor import Executor, ExecutionPolicy
@@ -13,6 +13,8 @@ __all__ = [
     "Node",
     "Serial",
     "Parallel",
+    "ByArgs",
+    "ByKeys",
     "Context",
     "ModuleAdapter",
     "Executor",

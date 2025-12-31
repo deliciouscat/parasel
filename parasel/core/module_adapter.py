@@ -49,6 +49,7 @@ class ModuleAdapter(Node):
         self.out_name = out_name
         self.func_kwargs = func_kwargs
         self.is_async = asyncio.iscoroutinefunction(func)
+        self._accumulate_result = False  # ByArgs/ByKeys에서 설정
     
     def run(self, context: Context) -> None:
         """동기 실행"""
@@ -95,7 +96,16 @@ class ModuleAdapter(Node):
             
             # 반환값이 있고 out_name이 지정되었으면 저장
             if result is not None and self.out_name:
-                context[self.out_name] = result
+                if self._accumulate_result:
+                    # 누적 모드: 기존 리스트에 추가
+                    if self.out_name not in context:
+                        context[self.out_name] = []
+                    elif not isinstance(context[self.out_name], list):
+                        context[self.out_name] = [context[self.out_name]]
+                    context[self.out_name].append(result)
+                else:
+                    # 일반 모드: 덮어쓰기
+                    context[self.out_name] = result
         
         except Exception as e:
             raise ExecutionError(
@@ -126,7 +136,16 @@ class ModuleAdapter(Node):
             
             # 반환값이 있고 out_name이 지정되었으면 저장
             if result is not None and self.out_name:
-                context[self.out_name] = result
+                if self._accumulate_result:
+                    # 누적 모드: 기존 리스트에 추가
+                    if self.out_name not in context:
+                        context[self.out_name] = []
+                    elif not isinstance(context[self.out_name], list):
+                        context[self.out_name] = [context[self.out_name]]
+                    context[self.out_name].append(result)
+                else:
+                    # 일반 모드: 덮어쓰기
+                    context[self.out_name] = result
         
         except Exception as e:
             raise ExecutionError(

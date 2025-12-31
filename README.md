@@ -8,6 +8,7 @@ AI 파이프라인을 직렬/병렬의 중첩 리스트로 통제하기 위한 �
 
 ## 주요 특징
 - **Composite 패턴**: Serial/Parallel 노드로 파이프라인을 트리 구조로 조립
+- **ByArgs/ByKeys**: 동일한 함수를 다른 인자나 데이터로 병렬 실행
 - **버전 관리**: TaskRegistry로 태스크별 여러 버전 관리 (latest, stable, semver)
 - **타입 안전**: Pydantic 스키마로 입력/출력 검증
 - **에러 핸들링**: 재시도, 타임아웃, fail-fast/collect 정책
@@ -26,6 +27,7 @@ cp .env.example .env
 # 3. 예제 실행
 python examples/simple_example.py          # 기본 파이프라인
 python examples/search_example.py          # 더미 데이터 검색
+python examples/by_args_keys_example.py    # ByArgs/ByKeys 사용법
 python examples/openrouter_example.py      # 실제 LLM 사용 (API 키 필요)
 
 # 4. FastAPI 서버 실행
@@ -205,3 +207,4 @@ MIT
 
 - [설계 문서](docs/architecture.md) - 아키텍처 및 디자인 패턴
 - [사용 가이드](USAGE.md) - 상세 사용법 및 예제
+- [ByArgs/ByKeys 가이드](docs/by_args_keys_guide.md) - 병렬 실행 헬퍼 사용법
