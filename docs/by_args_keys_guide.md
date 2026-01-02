@@ -2,6 +2,23 @@
 
 `ByArgs`와 `ByKeys`는 Parasel에서 동일한 함수를 여러 번 병렬로 실행할 때 사용하는 헬퍼 클래스입니다.
 
+## 중요: 함수 작성 규칙
+
+**모든 모듈 함수는 `context[out_name]`으로 결과를 저장해야 합니다.**
+
+```python
+# ✅ 올바른 방식
+def my_function(context: Context, out_name: str, **kwargs):
+    result = do_something()
+    context[out_name] = result  # Context에 직접 저장
+
+# ❌ 잘못된 방식 (일관성 없음)
+def my_function(context: Context, out_name: str, **kwargs):
+    return do_something()  # return 사용 지양
+```
+
+`ModuleAdapter`는 return 값도 지원하지만, **일관성과 명확성을 위해 `context[out_name]` 방식을 권장**합니다.
+
 ## 개요
 
 ### ByArgs
@@ -25,12 +42,13 @@
 ```python
 from parasel import ModuleAdapter, Parallel, ByArgs, Context
 
-def query_expansion(context: Context, language: str, out_name: str = None, **kwargs):
+def query_expansion(context: Context, language: str, out_name: str, **kwargs):
     """언어별 쿼리 확장"""
     if language == "en":
-        return ["query1_en", "query2_en"]
+        queries = ["query1_en", "query2_en"]
     else:
-        return ["query1_ko", "query2_ko"]
+        queries = ["query1_ko", "query2_ko"]
+    context[out_name] = queries
 
 expansion = ModuleAdapter(query_expansion, out_name="queries")
 
@@ -51,8 +69,9 @@ pipeline.run(ctx)
 ### ByArgs 다중 파라미터 (Cartesian Product)
 
 ```python
-def search(context: Context, engine: str, max_results: int, out_name: str = None, **kwargs):
-    return f"{engine}:{max_results}"
+def search(context: Context, engine: str, max_results: int, out_name: str, **kwargs):
+    result = f"{engine}:{max_results}"
+    context[out_name] = result
 
 search_node = ModuleAdapter(search, out_name="results")
 
@@ -73,9 +92,10 @@ pipeline.run(ctx)
 ### ByKeys 기본 사용법
 
 ```python
-def search(context: Context, input: str, out_name: str = None, **kwargs):
+def search(context: Context, input: str, out_name: str, **kwargs):
     """검색 실행"""
-    return f"result_for_{input}"
+    result = f"result_for_{input}"
+    context[out_name] = result
 
 search_node = ModuleAdapter(search, out_name="search_results")
 
@@ -128,18 +148,20 @@ pipeline.run(ctx)
 ```python
 from parasel import Serial, Parallel, ModuleAdapter, ByArgs, ByKeys, Executor
 
-def query_expansion(context: Context, language: str, out_name: str = None, **kwargs):
+def query_expansion(context: Context, language: str, out_name: str, **kwargs):
     """언어별 쿼리 확장"""
     if language == "en":
-        return ["python tutorial", "learn python"]
+        queries = ["python tutorial", "learn python"]
     else:
-        return ["파이썬 튜토리얼", "파이썬 배우기"]
+        queries = ["파이썬 튜토리얼", "파이썬 배우기"]
+    context[out_name] = queries
 
-def search(context: Context, input: str, out_name: str = None, **kwargs):
+def search(context: Context, input: str, out_name: str, **kwargs):
     """검색 실행"""
-    return {"query": input, "results": [f"result1", f"result2"]}
+    result = {"query": input, "results": [f"result1", f"result2"]}
+    context[out_name] = result
 
-def merge_results(context: Context, out_name: str = None, **kwargs):
+def merge_results(context: Context, out_name: str, **kwargs):
     """결과 병합"""
     all_results = context.get("search_results", [])
     merged = []
@@ -222,9 +244,10 @@ pipeline = Parallel([
 ### 커스텀 input_key_name
 
 ```python
-def my_func(context: Context, query: str, out_name: str = None, **kwargs):
+def my_func(context: Context, query: str, out_name: str, **kwargs):
     # 'query' 파라미터로 받음
-    return process(query)
+    result = process(query)
+    context[out_name] = result
 
 node = ModuleAdapter(my_func, out_name="results")
 
