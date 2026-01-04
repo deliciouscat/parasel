@@ -91,40 +91,31 @@ class ModuleAdapter(Node):
             # 추가 kwargs 병합
             call_kwargs.update(self.func_kwargs)
             
-            # 누적 모드일 때: 함수 실행 전 context 값 저장
-            old_value = None
+            # 누적 모드일 때: out_name을 임시 키로 변경하여 함수가 직접 쓰는 것 처리
+            temp_out_name = None
             if self._accumulate_result and self.out_name:
-                old_value = context.get(self.out_name)
+                temp_out_name = f"_temp_{self.out_name}_{id(self)}"
+                # out_name이 파라미터에 있으면 임시 키로 변경
+                if "out_name" in call_kwargs:
+                    call_kwargs["out_name"] = temp_out_name
             
             # 함수 호출
             result = self.func(**call_kwargs)
             
-            # 누적 모드일 때: context에 직접 쓴 경우도 처리
+            # 누적 모드일 때: 결과를 원자적으로 누적
             if self._accumulate_result and self.out_name:
-                # 함수가 context에 직접 썼는지 확인
-                new_value = context.get(self.out_name)
-                
-                # context에 직접 쓴 경우 (return이 None이어도 됨)
-                if new_value != old_value:
-                    # 이미 context에 쓴 값을 누적 리스트로 변환
-                    if old_value is None:
-                        # 첫 번째 결과
-                        context[self.out_name] = [new_value]
-                    elif isinstance(old_value, list):
-                        # 이미 리스트인 경우 추가
-                        context[self.out_name] = old_value + [new_value]
-                    else:
-                        # 기존 값을 리스트로 변환하여 추가
-                        context[self.out_name] = [old_value, new_value]
-                # return 값이 있는 경우도 처리
+                # 함수가 임시 키에 직접 썼는지 확인
+                if temp_out_name and temp_out_name in context:
+                    value_to_accumulate = context.get(temp_out_name)
+                    del context._data[temp_out_name]  # 임시 키 정리
                 elif result is not None:
-                    if old_value is None:
-                        context[self.out_name] = [result]
-                    elif isinstance(old_value, list):
-                        old_value.append(result)
-                        context[self.out_name] = old_value
-                    else:
-                        context[self.out_name] = [old_value, result]
+                    value_to_accumulate = result
+                else:
+                    value_to_accumulate = None
+                
+                if value_to_accumulate is not None:
+                    # 원자적 누적 연산 사용
+                    context.accumulate(self.out_name, value_to_accumulate)
             # 일반 모드
             elif result is not None and self.out_name:
                 context[self.out_name] = result
@@ -153,40 +144,31 @@ class ModuleAdapter(Node):
             # 추가 kwargs 병합
             call_kwargs.update(self.func_kwargs)
             
-            # 누적 모드일 때: 함수 실행 전 context 값 저장
-            old_value = None
+            # 누적 모드일 때: out_name을 임시 키로 변경하여 함수가 직접 쓰는 것 처리
+            temp_out_name = None
             if self._accumulate_result and self.out_name:
-                old_value = context.get(self.out_name)
+                temp_out_name = f"_temp_{self.out_name}_{id(self)}"
+                # out_name이 파라미터에 있으면 임시 키로 변경
+                if "out_name" in call_kwargs:
+                    call_kwargs["out_name"] = temp_out_name
             
             # 비동기 함수 호출
             result = await self.func(**call_kwargs)
             
-            # 누적 모드일 때: context에 직접 쓴 경우도 처리
+            # 누적 모드일 때: 결과를 원자적으로 누적
             if self._accumulate_result and self.out_name:
-                # 함수가 context에 직접 썼는지 확인
-                new_value = context.get(self.out_name)
-                
-                # context에 직접 쓴 경우 (return이 None이어도 됨)
-                if new_value != old_value:
-                    # 이미 context에 쓴 값을 누적 리스트로 변환
-                    if old_value is None:
-                        # 첫 번째 결과
-                        context[self.out_name] = [new_value]
-                    elif isinstance(old_value, list):
-                        # 이미 리스트인 경우 추가
-                        context[self.out_name] = old_value + [new_value]
-                    else:
-                        # 기존 값을 리스트로 변환하여 추가
-                        context[self.out_name] = [old_value, new_value]
-                # return 값이 있는 경우도 처리
+                # 함수가 임시 키에 직접 썼는지 확인
+                if temp_out_name and temp_out_name in context:
+                    value_to_accumulate = context.get(temp_out_name)
+                    del context._data[temp_out_name]  # 임시 키 정리
                 elif result is not None:
-                    if old_value is None:
-                        context[self.out_name] = [result]
-                    elif isinstance(old_value, list):
-                        old_value.append(result)
-                        context[self.out_name] = old_value
-                    else:
-                        context[self.out_name] = [old_value, result]
+                    value_to_accumulate = result
+                else:
+                    value_to_accumulate = None
+                
+                if value_to_accumulate is not None:
+                    # 원자적 누적 연산 사용
+                    context.accumulate(self.out_name, value_to_accumulate)
             # 일반 모드
             elif result is not None and self.out_name:
                 context[self.out_name] = result

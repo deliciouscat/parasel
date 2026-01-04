@@ -114,6 +114,33 @@ class Context:
         else:
             return self._data.copy()
     
+    def accumulate(self, key: str, value: Any) -> None:
+        """
+        키에 값을 누적합니다 (원자적 연산).
+        
+        - 키가 없으면 [value]로 초기화
+        - 키가 있고 리스트면 value를 추가
+        - 키가 있고 리스트가 아니면 [기존값, value]로 변환
+        
+        병렬 실행에서 결과를 안전하게 누적할 때 사용합니다.
+        """
+        if self._thread_safe and self._lock:
+            with self._lock:
+                self._accumulate_impl(key, value)
+        else:
+            self._accumulate_impl(key, value)
+    
+    def _accumulate_impl(self, key: str, value: Any) -> None:
+        """누적 연산의 실제 구현"""
+        current = self._data.get(key)
+        if current is None:
+            self._data[key] = [value]
+        elif isinstance(current, list):
+            current.append(value)
+        else:
+            self._data[key] = [current, value]
+        self._written_keys.add(key)
+    
     def get_accessed_keys(self) -> Set[str]:
         """실행 중 접근된 키들 반환 (디버깅/검증용)"""
         return self._accessed_keys.copy()

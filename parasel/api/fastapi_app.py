@@ -41,7 +41,7 @@ def Run(
     policy: Optional[ExecutionPolicy] = None,
 ) -> Dict[str, Any]:
     """
-    태스크를 실행하는 편의 함수.
+    태스크를 실행하는 편의 함수 (동기).
     
     Args:
         user_input: 입력 데이터 딕셔너리
@@ -93,6 +93,85 @@ def Run(
     # Executor로 실행
     executor = Executor(policy=policy)
     result = executor.run(task_spec.node, context=context)
+    
+    # 출력 데이터 추출
+    output_data = context.to_dict()
+    
+    # 출력 스키마 검증
+    if task_spec.schema_out and result.success:
+        try:
+            validate_schema(output_data, task_spec.schema_out, f"Output validation for {task_id}")
+        except SchemaValidationError as e:
+            raise ValueError(str(e))
+    
+    return {
+        "success": result.success,
+        "duration": result.duration,
+        "data": output_data,
+        "errors": [str(e) for e in result.errors],
+        "task_id": task_id,
+        "version": task_spec.version,
+    }
+
+
+async def RunAsync(
+    user_input: Dict[str, Any],
+    task: Optional[str] = None,
+    version: str = "latest",
+    registry: Optional[TaskRegistry] = None,
+    policy: Optional[ExecutionPolicy] = None,
+) -> Dict[str, Any]:
+    """
+    태스크를 실행하는 편의 함수 (비동기).
+    
+    async 함수를 포함한 파이프라인을 실행할 때 사용합니다.
+    
+    Args:
+        user_input: 입력 데이터 딕셔너리
+        task: 태스크 ID (None이면 user_input["task"] 사용)
+        version: 버전 (기본값 "latest")
+        registry: TaskRegistry 인스턴스 (None이면 전역 레지스트리 사용)
+        policy: ExecutionPolicy (None이면 기본 정책 사용)
+    
+    Returns:
+        실행 결과 딕셔너리
+    
+    Example:
+        result = await RunAsync(
+            {"query": "search term", "task": "search"},
+            version="0.1.0"
+        )
+    """
+    # 레지스트리 결정
+    if registry is None:
+        registry = get_global_registry()
+    
+    # task_id 결정
+    task_id = task or user_input.get("task")
+    if not task_id:
+        raise ValueError(
+            "task must be specified either as argument or in user_input['task']"
+        )
+    
+    # 태스크 스펙 가져오기
+    try:
+        task_spec = registry.get(task_id, version=version)
+    except TaskNotFoundError as e:
+        raise ValueError(str(e))
+    
+    # 입력 스키마 검증
+    if task_spec.schema_in:
+        try:
+            validate_schema(user_input, task_spec.schema_in, f"Input validation for {task_id}")
+        except SchemaValidationError as e:
+            raise ValueError(str(e))
+    
+    # Context 생성
+    context = Context(user_input, thread_safe=True)
+    
+    # Executor로 비동기 실행
+    executor = Executor(policy=policy)
+    result = await executor.run_async(task_spec.node, context=context)
     
     # 출력 데이터 추출
     output_data = context.to_dict()
@@ -191,11 +270,11 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(e))
     
     @app.post("/run/{task_id}", response_model=RunResponse)
-    def run_task(
+    async def run_task(
         task_id: str,
         request: RunRequest,
     ):
-        """태스크 실행"""
+        """태스크 실행 (async 지원)"""
         try:
             # version은 request에서 가져옴
             version = request.version
@@ -208,8 +287,8 @@ def create_app(
                     detail="task_id must be provided in path or request"
                 )
             
-            # Run 함수로 실행
-            result = Run(
+            # RunAsync 함수로 실행 (async 함수 지원)
+            result = await RunAsync(
                 user_input=request.data,
                 task=final_task_id,
                 version=version,
