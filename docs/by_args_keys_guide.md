@@ -7,17 +7,20 @@
 **모든 모듈 함수는 `context[out_name]`으로 결과를 저장해야 합니다.**
 
 ```python
-# ✅ 올바른 방식
+# ✅ 권장 방식: Context에 직접 저장
 def my_function(context: Context, out_name: str, **kwargs):
     result = do_something()
-    context[out_name] = result  # Context에 직접 저장
+    context[out_name] = result
 
-# ❌ 잘못된 방식 (일관성 없음)
+# ✅ 대안: return 사용 (ByArgs/ByKeys에서도 자동 누적됨)
 def my_function(context: Context, out_name: str, **kwargs):
-    return do_something()  # return 사용 지양
+    return do_something()
 ```
 
-`ModuleAdapter`는 return 값도 지원하지만, **일관성과 명확성을 위해 `context[out_name]` 방식을 권장**합니다.
+**ByArgs/ByKeys와 함께 사용 시:**
+- `context[out_name] = result` 방식: ✅ 자동 누적
+- `return result` 방식: ✅ 자동 누적
+- 두 방식 모두 정상 동작하지만, **일관성을 위해 `context[out_name]` 방식을 권장**합니다.
 
 ## 개요
 

@@ -91,21 +91,43 @@ class ModuleAdapter(Node):
             # 추가 kwargs 병합
             call_kwargs.update(self.func_kwargs)
             
+            # 누적 모드일 때: 함수 실행 전 context 값 저장
+            old_value = None
+            if self._accumulate_result and self.out_name:
+                old_value = context.get(self.out_name)
+            
             # 함수 호출
             result = self.func(**call_kwargs)
             
-            # 반환값이 있고 out_name이 지정되었으면 저장
-            if result is not None and self.out_name:
-                if self._accumulate_result:
-                    # 누적 모드: 기존 리스트에 추가
-                    if self.out_name not in context:
-                        context[self.out_name] = []
-                    elif not isinstance(context[self.out_name], list):
-                        context[self.out_name] = [context[self.out_name]]
-                    context[self.out_name].append(result)
-                else:
-                    # 일반 모드: 덮어쓰기
-                    context[self.out_name] = result
+            # 누적 모드일 때: context에 직접 쓴 경우도 처리
+            if self._accumulate_result and self.out_name:
+                # 함수가 context에 직접 썼는지 확인
+                new_value = context.get(self.out_name)
+                
+                # context에 직접 쓴 경우 (return이 None이어도 됨)
+                if new_value != old_value:
+                    # 이미 context에 쓴 값을 누적 리스트로 변환
+                    if old_value is None:
+                        # 첫 번째 결과
+                        context[self.out_name] = [new_value]
+                    elif isinstance(old_value, list):
+                        # 이미 리스트인 경우 추가
+                        context[self.out_name] = old_value + [new_value]
+                    else:
+                        # 기존 값을 리스트로 변환하여 추가
+                        context[self.out_name] = [old_value, new_value]
+                # return 값이 있는 경우도 처리
+                elif result is not None:
+                    if old_value is None:
+                        context[self.out_name] = [result]
+                    elif isinstance(old_value, list):
+                        old_value.append(result)
+                        context[self.out_name] = old_value
+                    else:
+                        context[self.out_name] = [old_value, result]
+            # 일반 모드
+            elif result is not None and self.out_name:
+                context[self.out_name] = result
         
         except Exception as e:
             raise ExecutionError(
@@ -131,21 +153,43 @@ class ModuleAdapter(Node):
             # 추가 kwargs 병합
             call_kwargs.update(self.func_kwargs)
             
+            # 누적 모드일 때: 함수 실행 전 context 값 저장
+            old_value = None
+            if self._accumulate_result and self.out_name:
+                old_value = context.get(self.out_name)
+            
             # 비동기 함수 호출
             result = await self.func(**call_kwargs)
             
-            # 반환값이 있고 out_name이 지정되었으면 저장
-            if result is not None and self.out_name:
-                if self._accumulate_result:
-                    # 누적 모드: 기존 리스트에 추가
-                    if self.out_name not in context:
-                        context[self.out_name] = []
-                    elif not isinstance(context[self.out_name], list):
-                        context[self.out_name] = [context[self.out_name]]
-                    context[self.out_name].append(result)
-                else:
-                    # 일반 모드: 덮어쓰기
-                    context[self.out_name] = result
+            # 누적 모드일 때: context에 직접 쓴 경우도 처리
+            if self._accumulate_result and self.out_name:
+                # 함수가 context에 직접 썼는지 확인
+                new_value = context.get(self.out_name)
+                
+                # context에 직접 쓴 경우 (return이 None이어도 됨)
+                if new_value != old_value:
+                    # 이미 context에 쓴 값을 누적 리스트로 변환
+                    if old_value is None:
+                        # 첫 번째 결과
+                        context[self.out_name] = [new_value]
+                    elif isinstance(old_value, list):
+                        # 이미 리스트인 경우 추가
+                        context[self.out_name] = old_value + [new_value]
+                    else:
+                        # 기존 값을 리스트로 변환하여 추가
+                        context[self.out_name] = [old_value, new_value]
+                # return 값이 있는 경우도 처리
+                elif result is not None:
+                    if old_value is None:
+                        context[self.out_name] = [result]
+                    elif isinstance(old_value, list):
+                        old_value.append(result)
+                        context[self.out_name] = old_value
+                    else:
+                        context[self.out_name] = [old_value, result]
+            # 일반 모드
+            elif result is not None and self.out_name:
+                context[self.out_name] = result
         
         except Exception as e:
             raise ExecutionError(
