@@ -93,6 +93,7 @@ class Serial(Node):
         super().__init__(name=name or "Serial", **kwargs)
         self.children = children
         self.continue_on_error = continue_on_error
+        self.expose_keys: Optional[List[str]] = None
     
     def run(self, context: Context) -> None:
         """자식 노드들을 순차 실행"""
@@ -143,6 +144,22 @@ class Serial(Node):
                 f"Serial node '{self.name}' completed with {len(errors)} error(s)",
                 node_name=self.name,
             )
+    
+    def expose(self, expose_keys: List[str]) -> "Serial":
+        """
+        API 응답으로 노출할 키들을 지정합니다.
+        
+        Args:
+            expose_keys: Context에서 노출할 키 리스트
+        
+        Returns:
+            self (메서드 체이닝 지원)
+        
+        Example:
+            Serial([...]).expose(["result1", "result2"])
+        """
+        self.expose_keys = expose_keys
+        return self
 
 
 class Parallel(Node):
@@ -184,6 +201,7 @@ class Parallel(Node):
         self.children = flattened_children
         self.max_workers = max_workers or len(self.children) if self.children else 1
         self.fail_fast = fail_fast
+        self.expose_keys: Optional[List[str]] = None
     
     def run(self, context: Context) -> None:
         """자식 노드들을 병렬 실행 (ThreadPoolExecutor 사용)"""
@@ -274,6 +292,22 @@ class Parallel(Node):
                 + ", ".join(str(e) for e in errors),
                 node_name=self.name,
             )
+    
+    def expose(self, expose_keys: List[str]) -> "Parallel":
+        """
+        API 응답으로 노출할 키들을 지정합니다.
+        
+        Args:
+            expose_keys: Context에서 노출할 키 리스트
+        
+        Returns:
+            self (메서드 체이닝 지원)
+        
+        Example:
+            Parallel([...]).expose(["result1", "result2"])
+        """
+        self.expose_keys = expose_keys
+        return self
 
 
 class ByArgs:

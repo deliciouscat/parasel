@@ -97,6 +97,10 @@ def Run(
     # 출력 데이터 추출
     output_data = context.to_dict()
     
+    # expose_keys가 설정되어 있으면 해당 키들만 필터링
+    if hasattr(task_spec.node, 'expose_keys') and task_spec.node.expose_keys:
+        output_data = {k: v for k, v in output_data.items() if k in task_spec.node.expose_keys}
+    
     # 출력 스키마 검증
     if task_spec.schema_out and result.success:
         try:
@@ -175,6 +179,10 @@ async def RunAsync(
     
     # 출력 데이터 추출
     output_data = context.to_dict()
+    
+    # expose_keys가 설정되어 있으면 해당 키들만 필터링
+    if hasattr(task_spec.node, 'expose_keys') and task_spec.node.expose_keys:
+        output_data = {k: v for k, v in output_data.items() if k in task_spec.node.expose_keys}
     
     # 출력 스키마 검증
     if task_spec.schema_out and result.success:
