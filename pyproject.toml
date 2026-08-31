@@ -7,7 +7,7 @@ name = "parasel"
 version = "0.1.0"
 description = "AI 파이프라인을 직렬/병렬의 중첩 리스트로 통제하기 위한 프레임워크"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "parasel contributors"}
@@ -16,6 +16,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.0.0",
+    "pydantic-ai>=2.0,<3.0",
     "packaging>=23.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.25.0",
@@ -37,9 +38,8 @@ exclude = ["tests*", "examples*", "modules*", "tasks*"]
 
 [tool.black]
 line-length = 100
-target-version = ['py39']
+target-version = ['py310']
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
-
+target-version = "py310"

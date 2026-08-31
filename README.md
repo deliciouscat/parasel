@@ -1,6 +1,8 @@
 # Parasel
 
-AI 파이프라인을 직렬/병렬의 중첩 리스트로 통제하기 위한 프레임워크.  
+**Pydantic AI Agent를 직렬·병렬·fan-out 파이프라인으로 조립하고 FastAPI로 배포하는 경량 wrapper.**
+
+Pydantic AI가 모델 호출, tool, 구조화된 출력 검증을 맡고 Parasel은 여러 Agent와 일반 Python 단계를 조립한다. 자세한 사용법은 [Pydantic AI 통합 가이드](docs/pydantic_ai.md)를 참고하세요.
 
 ## 기능적 요구사항
 - 동일한 기능에 대해 다양한 파이프라인 versioning이 가능할 것
@@ -13,8 +15,11 @@ AI 파이프라인을 직렬/병렬의 중첩 리스트로 통제하기 위한 �
 - **타입 안전**: Pydantic 스키마로 입력/출력 검증
 - **에러 핸들링**: 재시도, 타임아웃, fail-fast/collect 정책
 - **FastAPI 통합**: 태스크를 HTTP 엔드포인트로 자동 노출
+- **Pydantic AI first-class**: Agent의 검증된 `output_type`을 Context에 그대로 전달
 
 ## 빠른 시작
+
+Pydantic AI 2.x를 사용하므로 Python 3.10 이상이 필요합니다.
 
 ```bash
 # 1. 의존성 설치
@@ -29,6 +34,7 @@ python examples/simple_example.py          # 기본 파이프라인
 python examples/search_example.py          # 더미 데이터 검색
 python examples/by_args_keys_example.py    # ByArgs/ByKeys 사용법
 python examples/openrouter_example.py      # 실제 LLM 사용 (API 키 필요)
+python examples/pydantic_ai_example.py     # Pydantic AI typed output (API 키 불필요)
 
 # 4. FastAPI 서버 실행
 python examples/api_example.py
